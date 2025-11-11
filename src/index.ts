@@ -55,7 +55,6 @@ function validateVideoInput(input: any, isUpdate = false): { valid: boolean, err
       }
     }
   } else if (!isUpdate) {
-    // при создании обязательно должно быть поле availableResolutions
     errors.push('Отсутствует "availableResolutions"');
   }
 
@@ -77,10 +76,19 @@ app.get('/videos/:id', (req: Request, res: Response) => {
   }
 });
 
-// создание нового видео
+// создание нового видео с автоматической установкой даты
 app.post('/videos', (req: Request, res: Response) => {
   const { body } = req;
-  const { valid, errors } = validateVideoInput(body);
+
+  // Вычисляем дату: из тела, если валидная, иначе текущая
+  const dateToUse = (body.date && typeof body.date === 'string' && !isNaN(Date.parse(body.date)))
+    ? new Date(body.date).toISOString()
+    : new Date().toISOString();
+
+  // Обновляем тело для валидации
+  const validatedBody = { ...body, date: dateToUse };
+
+  const { valid, errors } = validateVideoInput(validatedBody);
   if (!valid) {
     return res.status(400).json({ errors });
   }
@@ -90,9 +98,10 @@ app.post('/videos', (req: Request, res: Response) => {
     id,
     title: body.title,
     description: body.description,
-    date: new Date(body.date).toISOString(),
+    date: dateToUse,
     availableResolutions: body.availableResolutions
   };
+
   videos[id] = newVideo;
   res.status(201).json(newVideo);
 });
@@ -119,6 +128,8 @@ app.put('/videos/:id', (req: Request, res: Response) => {
   }
   if ('date' in body) {
     existingVideo.date = new Date(body.date).toISOString();
+  } else {
+    // Если не передан, можно оставить текущую или обновлять по необходимости
   }
   if ('availableResolutions' in body) {
     existingVideo.availableResolutions = body.availableResolutions;
